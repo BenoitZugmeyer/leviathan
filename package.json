@@ -2,9 +2,21 @@
   "name": "leviathan",
   "license": "MIT",
   "devDependencies": {
-    "eslint": "^3.18.0",
+    "babel-preset-react": "^6.24.1",
+    "babili": "^0.0.12",
+    "eslint": "^3.19.0",
+    "eslint-plugin-react": "^6.10.3",
     "minimist": "^1.2.0",
-    "mz": "^2.6.0"
+    "mz": "^2.6.0",
+    "preact": "^7.2.0",
+    "rollup": "^0.41.6",
+    "rollup-plugin-babel": "^2.7.1",
+    "rollup-plugin-node-resolve": "^3.0.0",
+    "rollup-watch": "^3.2.2",
+    "sans-sel": "^1.0.0-beta.1"
   },
-  "scripts": {}
+  "scripts": {
+    "build": "bin/build"
+  },
+  "dependencies": {}
 }

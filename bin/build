@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -euo pipefail
+
+BIN="$(npm bin)"
+
+cd $(dirname $0)/..
+rm -rf dist
+mkdir dist
+
+cp -r assets/* dist
+
+"$BIN"/rollup -c
+"$BIN"/babili dist/index.js -o dist/index.js
+hash=$(openssl sha256 dist/index.js | tail -c 65)
+sed -i "s/BUNDLE_NAME/index.js?$hash/" dist/index.html
