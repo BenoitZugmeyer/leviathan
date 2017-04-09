@@ -1,0 +1,303 @@
+#!/usr/bin/node
+
+const minimist = require("minimist")
+const { spawn } = require("child_process")
+const path = require("path")
+const url = require("url")
+const { mkdtemp, rmdir, writeFile, readdir, unlink, lstat } = require("mz/fs")
+const { execFile } = require("mz/child_process")
+
+function parseListen(listen) {
+    let port, hostname
+    if (listen) {
+        if (listen.includes(":")) {
+            [hostname, port] = listen.split(":")
+        }
+        else if (Number(listen)) {
+            port = listen
+        }
+        else {
+            hostname = listen
+        }
+    }
+    return {
+        hostname: hostname || "localhost",
+        port: port || "8080",
+    }
+}
+
+const TYPE_PROXY_PASS = "PROXY_PASS"
+const TYPE_STATIC = "STATIC"
+
+function splat(arg) {
+    if (Array.isArray(arg)) return arg
+    if (arg !== undefined) return [arg]
+    return []
+}
+
+function parseUpstreams(upstreams) {
+    upstreams = splat(upstreams)
+    if (!upstreams.length) upstreams = ["/=."]
+    return upstreams.map((upstream) => {
+        const invalid = () => {
+            throw new Error(`Invalid upstream "${upstream}"`)
+        }
+        const index = upstream.indexOf("=")
+        if (index < 0) invalid()
+
+        const location = upstream.slice(0, index)
+        const upstreamURL = upstream.slice(index + 1)
+        const parsed = url.parse(upstreamURL)
+
+        if (parsed.hostname && parsed.protocol) {
+            if (parsed.path !== "/") invalid()
+            return {
+                location,
+                type: TYPE_PROXY_PASS,
+                url: upstreamURL,
+                hostname: parsed.hostname,
+            }
+        }
+
+        if (parsed.hostname) invalid()
+        if (parsed.protocol) invalid()
+        if (parsed.path === "/") invalid()
+
+        return {
+            location,
+            type: TYPE_STATIC,
+            root: `${path.resolve(parsed.path)}/`,
+        }
+    })
+}
+
+function parseArguments() {
+    const string = [
+        "listen",
+        "L",
+        "ssl-hostname",
+        "ssl-key",
+        "ssl-certificate",
+    ]
+    const boolean = [ "help", "verbose" ]
+    const argv = minimist(process.argv.slice(2), {
+        boolean,
+        string,
+        alias: { L: "listen" },
+    })
+
+    for (const key in argv) {
+        if (key !== "_" && !(string.includes(key) || boolean.includes(key))) {
+            console.log(`Invalid option "${key}".`)
+            process.exit(1)
+        }
+    }
+
+    if (argv.help) {
+        printHelp()
+        process.exit(1)
+    }
+
+    try {
+        const listen = parseListen(argv.listen)
+        return {
+            upstreams: parseUpstreams(argv._),
+            listen,
+            sslHostnames: splat(argv["ssl-hostname"] || listen.hostname),
+            verbose: argv.verbose,
+        }
+    }
+    catch (e) {
+        console.log(String(e))
+        process.exit(1)
+    }
+}
+
+function printHelp() {
+    console.log(`\
+${process.argv[0]} OPTIONS UPSTREAMS...
+
+UPSTREAMS should be formated as LOCATION=URL_OR_PATH.  If URL_OR_PATH is a URL, the requests made at
+the given LOCATION will be sent to the upstream server.  Else, URL_OR_PATH should be a local PATH
+and files within this path will be served.  This option can be specified multiple time.  If no
+upstream is given, defaults to "/=." (serve the current directory).
+
+For the LOCATION syntax, see http://nginx.org/en/docs/http/ngx_http_core_module.html#location
+For the URL syntax, see http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass
+For the PATH syntax, see http://nginx.org/en/docs/http/ngx_http_core_module.html#alias
+
+Options:
+
+    --listen/-L HOSTNAME:PORT
+      Address and port to listen.  Both hostname and port can be omitted.  Defaults to
+      "localhost:8080".
+
+    --ssl-hostname HOSTNAME
+      Hostname to use when generating the SSL certificate.  Can be used multiple times. Can contain
+      glob for subdomains (ex: *.example.com).
+
+    --help
+      Show this help and quit.
+
+    --verbose
+      Print more stuff.
+`)
+}
+
+async function rmdirr(directory) {
+    for (const fileName of await readdir(directory)) {
+        const filePath = path.resolve(directory, fileName)
+        const fileStats = await lstat(filePath)
+        if (fileStats.isDirectory()) {
+            await rmdirr(filePath)
+        }
+        else {
+            await unlink(filePath)
+        }
+    }
+    await rmdir(directory)
+}
+
+async function withTempDirectory(fn) {
+    const directory = path.resolve(await mkdtemp("tmp-leviathan-"))
+    process.chdir(directory)
+    try {
+        await fn(directory)
+    }
+    finally {
+        await rmdirr(directory)
+    }
+}
+
+function wait(child) {
+    return new Promise((resolve) => {
+        child.on("exit", (code, signal) => resolve({ code, signal }))
+    })
+}
+
+function getNginxConfiguration({
+    directory,
+    hostname,
+    port,
+    upstreams,
+    sslCertificate,
+    sslCertificateKey,
+    verbose,
+}) {
+    return `
+pid ${directory}/nginx.pid;
+daemon off;
+error_log stderr ${verbose ? "notice" : "warn"};
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    client_body_temp_path ${directory}/client-body;
+    fastcgi_temp_path ${directory}/fastcgi;
+    uwsgi_temp_path ${directory}/uwsgi;
+    scgi_temp_path ${directory}/scgi;
+
+    access_log ${directory}/access.log;
+
+    server {
+        listen ${hostname}:${port} ssl http2;
+
+        ssl_certificate ${sslCertificate};
+        ssl_certificate_key ${sslCertificateKey};
+
+        error_page 497 https://$host:$server_port$request_uri;
+
+        ${upstreams.map(({ hostname, url, location, type, root }) => (`
+        location ${location} {
+            ${type === TYPE_STATIC ? `
+            alias ${root};
+            autoindex on;
+            ` : `
+            proxy_set_header Host ${hostname};
+            proxy_pass ${url};
+            `}
+        }
+        `)).join("\n")}
+    }
+}
+`
+}
+
+async function generateSelfSignedCertificate({ directory, hostnames }) {
+    const basePath = path.resolve(directory, hostnames[0])
+    const privateKeyPath = `${basePath}.private_key.pem`
+    const selfSignedCertificatePath = `${basePath}.self_signed_certificate.pem`
+
+    const organization = `Self signed certificate for ${hostnames.join(", ")}`
+    const names = hostnames.map((h) => `CN=${h}`).join("/")
+    await execFile("openssl", [
+        "req",
+        "-batch",
+        "-x509",
+        "-new",
+        "-newkey", "rsa:2048",
+        "-days", "365",
+        "-nodes",
+        "-out", selfSignedCertificatePath,
+        "-keyout", privateKeyPath,
+        "-subj", `/C=AU/O=${organization}/${names}`,
+    ], { stdio: "inherit" })
+
+    return { privateKeyPath, selfSignedCertificatePath }
+}
+
+(async () => {
+    const { listen: { hostname, port }, upstreams, sslHostnames, verbose } = parseArguments()
+    await withTempDirectory(async (directory) => {
+        console.log(`\
+Temporary directory: ${directory}
+Listen: ${hostname}:${port}
+Upstreams:
+${upstreams.map(({ location, url, root, type }) => (`\
+  ${location}\t${type === TYPE_STATIC ? root : url}
+`)).join("")}`)
+
+        console.log("Generating certificates...")
+        const {
+            selfSignedCertificatePath: sslCertificate,
+            privateKeyPath: sslCertificateKey,
+        } = await generateSelfSignedCertificate({
+            directory,
+            hostnames: sslHostnames,
+        })
+
+        const configuration = getNginxConfiguration({
+            directory,
+            port,
+            hostname,
+            upstreams,
+            sslCertificate,
+            sslCertificateKey,
+            verbose,
+        })
+        if (verbose) {
+            console.log(`Using NGINX configuration:\n\`\`\`\n${configuration}\n\`\`\``)
+        }
+        console.log("Launching HTTP server (use ^C to quit)...")
+        await writeFile("nginx.conf", configuration)
+
+        const nginxProcess = spawn("nginx", [
+            "-c", "nginx.conf",
+            "-p", ".",
+        ], {
+            stdio: "inherit",
+        })
+
+        process.on("SIGINT", () => {
+            // Ignore sigint (will be passed to the nginx process anyway)
+            console.log("Caught SIGINT, stoping...")
+        })
+
+        const { code } = await wait(nginxProcess)
+        if (code) {
+            console.log(`NGINX exited with code ${code}`)
+        }
+    })
+})().catch((e) => console.log("Unhandled error:", e))

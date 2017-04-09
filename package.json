@@ -1,0 +1,10 @@
+{
+  "name": "leviathan",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^3.18.0",
+    "minimist": "^1.2.0",
+    "mz": "^2.6.0"
+  },
+  "scripts": {}
+}

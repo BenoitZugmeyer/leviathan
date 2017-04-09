@@ -1,0 +1,31 @@
+extends:
+    - eslint:recommended
+
+rules:
+    arrow-parens: error
+    arrow-spacing: error
+    brace-style: [error, stroustrup]
+    comma-dangle: [error, always-multiline]
+    indent: [error, 4]
+    keyword-spacing: error
+    no-console: off
+    no-constant-condition: off
+    no-trailing-spaces: error
+    no-unexpected-multiline: error
+    no-unreachable: error
+    no-unused-vars: [error, { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }]
+    no-var: error
+    object-shorthand: error
+    prefer-arrow-callback: error
+    prefer-const: error
+    prefer-template: error
+    quotes: [error, double]
+    semi: [error, never]
+
+env:
+    es6: true
+    node: true
+
+parserOptions:
+    sourceType: module
+    ecmaVersion: 8
