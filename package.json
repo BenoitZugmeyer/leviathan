@@ -8,12 +8,12 @@
     "eslint-plugin-react": "^6.10.3",
     "minimist": "^1.2.0",
     "mz": "^2.6.0",
-    "preact": "^7.2.0",
+    "preact": "^8.1.0",
     "rollup": "^0.41.6",
     "rollup-plugin-babel": "^2.7.1",
     "rollup-plugin-node-resolve": "^3.0.0",
     "rollup-watch": "^3.2.2",
-    "sans-sel": "^1.0.0-beta.1"
+    "sans-sel": "1.0.0-beta.2"
   },
   "scripts": {
     "build": "bin/build",

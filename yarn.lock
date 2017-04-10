@@ -1780,9 +1780,9 @@ pluralize@^1.2.1:
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/pluralize/-/pluralize-1.2.1.tgz#d1a21483fd22bb41e58a12fa3421823140897c45"
 
-preact@^7.2.0:
-  version "7.2.1"
-  resolved "https://registry.yarnpkg.com/preact/-/preact-7.2.1.tgz#159e1892f614985e49eb0a96fd6e6d8bdf8bbcc5"
+preact@^8.1.0:
+  version "8.1.0"
+  resolved "https://registry.yarnpkg.com/preact/-/preact-8.1.0.tgz#f035b808eebb74e46d56246b02ca0f190b6d6574"
 
 prelude-ls@~1.1.2:
   version "1.1.2"
@@ -2008,9 +2008,9 @@ safe-buffer@^5.0.1:
   version "5.0.1"
   resolved "https://registry.yarnpkg.com/safe-buffer/-/safe-buffer-5.0.1.tgz#d263ca54696cd8a306b5ca6551e92de57918fbe7"
 
-sans-sel@^1.0.0-beta.1:
-  version "1.0.0-beta.1"
-  resolved "https://registry.yarnpkg.com/sans-sel/-/sans-sel-1.0.0-beta.1.tgz#55039e0b4acb1d4777a54aaf0ec905f06308523e"
+sans-sel@1.0.0-beta.2:
+  version "1.0.0-beta.2"
+  resolved "https://registry.yarnpkg.com/sans-sel/-/sans-sel-1.0.0-beta.2.tgz#8db4b5778ecbf9a031f4295bfd932846c39e499f"
 
 semver@^5.3.0:
   version "5.3.0"
