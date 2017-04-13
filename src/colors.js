@@ -277,4 +277,13 @@ export const black = "#000000"
 export const white = "#ffffff"
 
 export const darkPrimaryText = "rgba(0, 0, 0, 0.87)"
-export const lightPrimaryText = "#ffffff"
+export const darkSecondaryText = "rgba(0, 0, 0, 0.54)"
+export const darkDisabledText = "rgba(0, 0, 0, 0.38)"
+export const darkHintText = darkDisabledText
+export const darkDividers = "rgba(0, 0, 0, 0.12)"
+
+export const lightPrimaryText = white
+export const lightSecondaryText = "rgba(255, 255, 255, 0.7)"
+export const lightDisabledText = "rgba(255, 255, 255, 0.5)"
+export const lightHintText = lightDisabledText
+export const lightDividers = "rgba(255, 255, 255, 0.12)"
