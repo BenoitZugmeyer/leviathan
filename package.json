@@ -3,23 +3,23 @@
   "license": "MIT",
   "devDependencies": {
     "babel-preset-react": "^6.24.1",
-    "babili": "^0.0.12",
+    "babili-webpack-plugin": "^0.0.11",
     "eslint": "^3.19.0",
     "eslint-plugin-react": "^6.10.3",
-    "fs-extra": "^2.1.2",
+    "html-webpack-plugin": "^2.28.0",
     "preact": "^8.1.0",
     "rollup": "^0.41.6",
+    "rollup-loader": "0.2.0",
     "rollup-plugin-babel": "^2.7.1",
-    "rollup-plugin-livereload": "^0.4.0",
     "rollup-plugin-node-resolve": "^3.0.0",
-    "rollup-plugin-serve": "^0.3.0",
-    "rollup-watch": "^3.2.2",
-    "sans-sel": "1.0.0-beta.2"
+    "sans-sel": "1.0.0-beta.2",
+    "webpack": "^2.3.3",
+    "webpack-dev-server": "^2.4.2"
   },
   "scripts": {
-    "dist": "node bin/build",
-    "dev": "node bin/build dev",
-    "update-demo": "NODE_ENV=production node bin/build && git checkout gh-pages && mv dist/* . && rmdir dist && git add -u && git commit -m 'update demo'"
+    "dist": "webpack",
+    "dev": "NODE_ENV=development webpack-dev-server -d",
+    "update-demo": "webpack && git checkout gh-pages && mv dist/* . && rmdir dist && git add -u && git commit -m 'update demo'"
   },
   "dependencies": {}
 }
