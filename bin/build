@@ -1,16 +1,106 @@
-#!/bin/bash
+#!/usr/bin/nodejs
 
-set -euo pipefail
+const path = require("path")
+const { createHash } = require("crypto")
+const {
+    removeSync: remove,
+    copySync: copy,
+    readFileSync: readFile,
+    writeFileSync: writeFile,
+    createReadStream,
+} = require("fs-extra")
+const rollup = require("rollup")
+const rollupWatch = require("rollup-watch")
+const rollupBabel = require("rollup-plugin-babel")
+const rollupResolve = require("rollup-plugin-node-resolve")
+const rollupServe = require("rollup-plugin-serve")
+const rollupLivereload = require("rollup-plugin-livereload")
 
-BIN="$(npm bin)"
+function getPath(subPath) {
+    return path.resolve(path.join(__dirname, "..", ...subPath.split("/")))
+}
 
-cd $(dirname $0)/..
-rm -rf dist
-mkdir dist
+const PRODUCTION = process.argv[2] !== "dev"
 
-cp -r assets/* dist
+const rollupOptions = {
+    entry: getPath("src/index.js"),
+    plugins: [
+        rollupBabel(),
+        rollupResolve({
+            jsnext: true,
+            customResolveOptions: {
+                paths: [ getPath(".") ],
+            },
+        }),
+    ],
+    format: "iife",
+    dest: "dist/index.js",
+    intro: `var __DEV__ = ${!PRODUCTION};`,
+}
 
-"$BIN"/rollup -c
-"$BIN"/babili dist/index.js -o dist/index.js
-hash=$(openssl sha256 dist/index.js | tail -c 65)
-sed -i "s/BUNDLE_NAME/index.js?$hash/" dist/index.html
+if (!PRODUCTION) {
+    rollupOptions.plugins.push(
+        rollupServe(getPath("dist")),
+        rollupLivereload({ watch: getPath("dist") })
+    )
+}
+
+(async () => {
+    console.log("Cleanup...")
+    remove(getPath("dist"))
+
+    console.log("Copy assets...")
+    copy(getPath("assets"), getPath("dist"))
+
+    if (PRODUCTION) {
+        console.log("Bundling...")
+        const bundle = await rollup.rollup(rollupOptions)
+        await bundle.write(rollupOptions)
+
+        console.log("Format index.html...")
+        const hash = await hashFile(getPath("dist/index.js"))
+        setBundleName(`index.js?${hash.toString("hex")}`)
+
+        // TODO babili
+    }
+    else {
+        setBundleName("index.js")
+
+        const watcher = rollupWatch(rollup, rollupOptions)
+        watcher.on("event", ({ code, duration, error }) => {
+            switch (code) {
+            case "BUILD_START":
+                console.log("Bundling...")
+                break
+            case "BUILD_END":
+                console.log(`Bundled in ${duration}ms. Watching for changes...`)
+                break
+            case "ERROR":
+                console.log(`Error: ${error}`)
+                break
+            }
+        })
+    }
+})()
+
+function setBundleName(name) {
+    const indexPath = getPath("dist/index.html")
+    const indexContent = readFile(indexPath, { encoding: "utf-8" })
+        .replace(/BUNDLE_NAME/g, name)
+    writeFile(indexPath, indexContent)
+}
+
+function hashFile(filePath) {
+    return new Promise((resolve, reject) => {
+        const hash = createHash("sha256")
+
+        hash.on("error", reject)
+
+        hash.on("readable", () => {
+            const data = hash.read()
+            if (data) resolve(data)
+        })
+
+        createReadStream(filePath).pipe(hash)
+    })
+}

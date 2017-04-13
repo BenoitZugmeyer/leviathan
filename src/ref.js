@@ -3,4 +3,3 @@ export default function ref(component, name) {
         component[name] = el
     }
 }
-
