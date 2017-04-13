@@ -1,4 +1,4 @@
-#!/usr/bin/nodejs
+#!/usr/bin/node
 
 const path = require("path")
 const { createHash } = require("crypto")
