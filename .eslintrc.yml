@@ -35,6 +35,9 @@ env:
     node: true
     browser: true
 
+globals:
+    __DEV__: false
+
 parserOptions:
     sourceType: module
     ecmaVersion: 8
