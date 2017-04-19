@@ -22,11 +22,93 @@ const ss = style.namespace("root").addRules({
     account: {
         fontWeight: "bold",
     },
+    urlPath: {
+        opacity: "0.5",
+    },
+    paragraph: {
+        margin: "10px 0",
+    },
 })
+
+function assert(condition) {
+    if (!condition) throw new Error("Assertion failed")
+}
+
+function parseTootContent(content) {
+    return new DOMParser().parseFromString(content, "text/html").body
+}
+
+function formatURL(link) {
+    return <span>{link.host}<span class={ss("urlPath")}>{link.pathname}</span></span>
+}
+
+function formatTootContentLink(node) {
+    assert(node.nodeName === "A")
+    let textContainer
+    let textPrefix
+    if (node.classList.contains("mention")) {
+        assert(node.childNodes.length === 2)
+        assert(node.childNodes[0].nodeName === "#text")
+        textPrefix = node.childNodes[0].textContent
+        textContainer = node.childNodes[1]
+    }
+    else {
+        textPrefix = ""
+        textContainer = node
+    }
+
+    let text
+    if (textContainer.childNodes.length === 3) {
+        assert(textContainer.childNodes[0].nodeName === "SPAN")
+        assert(textContainer.childNodes[1].nodeName === "SPAN")
+        assert(textContainer.childNodes[2].nodeName === "SPAN")
+        text = formatURL(node)
+    }
+    else {
+        assert(textContainer.childNodes.length === 1)
+        assert(textContainer.childNodes[0].nodeName === "#text")
+        text = textContainer.textContent
+    }
+    return (
+        <a href={node.getAttribute("href")} target="_blank">
+            {textPrefix}{text}
+        </a>
+    )
+}
+
+function formatTootContentParagraph(node) {
+    assert(node.nodeName === "P")
+    const children = []
+    for (const child of node.childNodes) {
+        if (child.nodeName === "#text") {
+            children.push(child.textContent)
+        }
+        else if (child.nodeName === "BR") {
+            children.push(<br />)
+        }
+        else if (child.nodeName === "SPAN" && child.getAttribute("class") === "h-card") {
+            children.push(formatTootContentLink(child.childNodes[0]))
+        }
+        else {
+            children.push(formatTootContentLink(child))
+        }
+    }
+    return <p class={ss("paragraph")}>{children}</p>
+}
+
+function formatTootContent(node) {
+    assert(node.nodeName === "BODY")
+    const result = []
+    for (const child of node.childNodes) {
+        result.push(formatTootContentParagraph(child))
+    }
+    return result
+}
 
 export default class Toot extends Component {
 
     renderToot(toot) {
+        const content = formatTootContent(parseTootContent(toot.content))
         return (
             <div class={ss("content")} onClick={bound(this, "onClick")}>
                 <div class={ss("avatar")}>
@@ -34,7 +116,7 @@ export default class Toot extends Component {
                 </div>
                 <div>
                     <div class={ss("account")}>{toot.account.acct}</div>
-                    <div dangerouslySetInnerHTML={{ __html: toot.content}} />
+                    <div>{content}</div>
                 </div>
             </div>
         )
