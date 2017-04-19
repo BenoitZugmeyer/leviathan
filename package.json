@@ -18,7 +18,7 @@
   },
   "scripts": {
     "dist": "webpack",
-    "dev": "NODE_ENV=development webpack-dev-server -d",
+    "dev": "NODE_ENV=development webpack-dev-server -d --devtool source-map",
     "update-demo": "webpack && git checkout gh-pages && mv dist/* . && rmdir dist && git add -u && git commit -m 'update demo'"
   },
   "dependencies": {}
