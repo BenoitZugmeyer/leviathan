@@ -64,10 +64,13 @@ function formatTootContentLink(node) {
         assert(textContainer.childNodes[2].nodeName === "SPAN")
         text = formatURL(node)
     }
-    else {
+    else if (textContainer.childNodes.length > 0) {
         assert(textContainer.childNodes.length === 1)
         assert(textContainer.childNodes[0].nodeName === "#text")
         text = textContainer.textContent
+    }
+    else {
+        return // no link
     }
     return (
         <a href={node.getAttribute("href")} target="_blank">
@@ -76,8 +79,8 @@ function formatTootContentLink(node) {
     )
 }
 
+
 function formatTootContentParagraph(node) {
-    assert(node.nodeName === "P")
     const children = []
     for (const child of node.childNodes) {
         if (child.nodeName === "#text") {
@@ -89,6 +92,9 @@ function formatTootContentParagraph(node) {
         else if (child.nodeName === "SPAN" && child.getAttribute("class") === "h-card") {
             children.push(formatTootContentLink(child.childNodes[0]))
         }
+        else if (child.nodeName === "SPAN") {
+            children.push(formatTootContentParagraph(child))
+        }
         else {
             children.push(formatTootContentLink(child))
         }
@@ -98,11 +104,20 @@ function formatTootContentParagraph(node) {
 
 function formatTootContent(node) {
     assert(node.nodeName === "BODY")
-    const result = []
-    for (const child of node.childNodes) {
-        result.push(formatTootContentParagraph(child))
+    if (node.firstElementChild && node.firstElementChild.nodeName === "P") {
+        const result = []
+        for (const child of node.childNodes) {
+            assert(child.nodeName === "P")
+            result.push(formatTootContentParagraph(child))
+        }
+        return result
     }
-    return result
+
+    return formatTootContentParagraph(node)
+}
+
+function hasAvatar(account) {
+    return !account.avatar.endsWith("/original/missing.png")
 }
 
 export default class Toot extends Component {
@@ -112,7 +127,7 @@ export default class Toot extends Component {
         return (
             <div class={ss("content")} onClick={bound(this, "onClick")}>
                 <div class={ss("avatar")}>
-                    <img src={toot.account.avatar} width="60" height="60" />
+                    {hasAvatar(toot.account) && <img src={toot.account.avatar} width="60" height="60" />}
                 </div>
                 <div>
                     <div class={ss("account")}>{toot.account.acct}</div>
